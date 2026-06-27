@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111827" />
+    <meta name="description" content="AutoSpares Pro - GST Billing & Inventory for Auto Parts Shops in India" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AutoSpares" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>AutoSpares Pro</title>
+    <style>
+      body { margin: 0; background: #030712; }
+      #splash { display: flex; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; }
+      #splash .logo { width: 56px; height: 56px; background: #f97316; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+      #splash p { color: #6b7280; font-family: sans-serif; font-size: 14px; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root">
+      <div id="splash">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
+        </div>
+        <p>AutoSpares Pro loading...</p>
+      </div>
+    </div>
+    <script>
+      // Register service worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('SW registered:', reg.scope);
+            // Request periodic sync for backup reminders
+            if ('periodicSync' in reg) {
+              reg.periodicSync.register('daily-backup-reminder', { minInterval: 24 * 60 * 60 * 1000 }).catch(() => {});
+            }
+          }).catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
