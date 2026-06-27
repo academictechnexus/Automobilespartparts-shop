@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+
+    <!-- Mobile viewport — critical for responsiveness -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    
+    <!-- PWA / App feel -->
+    <meta name="theme-color" content="#111827" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AutoSpares" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- Description -->
+    <meta name="description" content="AutoSpares Pro - GST Billing & Inventory for Auto Parts Shops" />
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="AutoSpares Pro" />
+    <meta property="og:description" content="GST Billing & Inventory for Auto Parts Shops in India" />
+    <meta property="og:type" content="website" />
+
+    <!-- Apple touch icon -->
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    
+    <title>AutoSpares Pro</title>
+
+    <!-- Splash screen style -->
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { background: #030712; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+      #splash {
+        display: flex; align-items: center; justify-content: center;
+        min-height: 100vh; flex-direction: column; gap: 16px;
+      }
+      .splash-logo {
+        width: 64px; height: 64px; background: #f97316; border-radius: 18px;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 0 40px rgba(249,115,22,0.4);
+        animation: pulse 1.5s ease infinite;
+      }
+      @keyframes pulse { 0%,100%{box-shadow:0 0 20px rgba(249,115,22,0.3)} 50%{box-shadow:0 0 50px rgba(249,115,22,0.6)} }
+      .splash-title { color: #fff; font-size: 22px; font-weight: 700; }
+      .splash-sub { color: #6b7280; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root">
+      <div id="splash">
+        <div class="splash-logo">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+            <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/>
+            <circle cx="6.5" cy="16.5" r="2.5"/>
+            <circle cx="16.5" cy="16.5" r="2.5"/>
+          </svg>
+        </div>
+        <div class="splash-title">AutoSpares Pro</div>
+        <div class="splash-sub">GST Billing & Inventory</div>
+      </div>
+    </div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registered'))
+            .catch(err => console.log('SW failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
