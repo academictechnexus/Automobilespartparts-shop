@@ -482,11 +482,12 @@ function NewInvoice({ onBack, onSave, shop, customers, parts, nextInvoiceNo }) {
 
 // ─── INVOICE LIST ─────────────────────────────────────────────────────────────
 export default function Billing() {
-  const { t, invoices, addInvoice, cancelInvoice, customers, shop, parts, nextInvoiceNo } = useApp();
+  const { t, invoices, addInvoice, updateInvoice, cancelInvoice, customers, shop, parts, nextInvoiceNo } = useApp();
   const [view, setView]           = useState('list');
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewInv, setViewInv]     = useState(null);
+  const [confirmCancel, setConfirmCancel] = useState(null);
 
   const filtered = invoices.filter(inv => {
     const ms = !search || inv.invoice_no?.toLowerCase().includes(search.toLowerCase()) || inv.customer_name?.toLowerCase().includes(search.toLowerCase());
@@ -545,6 +546,19 @@ export default function Billing() {
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 500);
+  };
+
+  const handleCancel = (inv) => {
+    const reason = window.prompt(`Cancel invoice ${inv.invoice_no}?\nEnter reason for cancellation:`);
+    if (reason !== null) {
+      cancelInvoice(inv.id, reason || 'Cancelled by admin');
+      setViewInv(null);
+    }
+  };
+
+  const handleMarkPaid = (inv) => {
+    updateInvoice(inv.id, { status:'paid', paid_amount: inv.grand_total, balance_due: 0 });
+    setViewInv(null);
   };
 
   const totals = {
@@ -626,6 +640,12 @@ export default function Billing() {
                   <button onClick={()=>handlePDF(inv)} title="PDF" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-orange-400 transition-colors"><Download size={13}/></button>
                   <button onClick={()=>handlePrint(inv)} title="Print" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors"><Printer size={13}/></button>
                   <button onClick={()=>handleWhatsApp(inv)} title="WhatsApp" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-green-400 transition-colors"><Phone size={13}/></button>
+                  {inv.status!=='cancelled'&&inv.status!=='paid'&&(
+                    <button onClick={()=>handleMarkPaid(inv)} title="Mark as Paid" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-green-400 transition-colors text-xs font-bold">✓</button>
+                  )}
+                  {inv.status!=='cancelled'&&(
+                    <button onClick={()=>handleCancel(inv)} title="Cancel Invoice" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-red-400 transition-colors text-xs">✕</button>
+                  )}
                 </div>
               </TD>
             </TRow>
@@ -687,10 +707,16 @@ export default function Billing() {
               {viewInv.balance_due>0&&<div className="flex justify-between text-red-400"><span>Balance Due</span><span>{fmt(viewInv.balance_due)}</span></div>}
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Btn variant="secondary" onClick={()=>handlePrint(viewInv)}><Printer size={13}/>Print</Btn>
               <Btn variant="secondary" onClick={()=>handlePDF(viewInv)}><Download size={13}/>PDF</Btn>
               <Btn variant="green" onClick={()=>handleWhatsApp(viewInv)}><Phone size={13}/>WhatsApp</Btn>
+              {viewInv.status!=='paid'&&viewInv.status!=='cancelled'&&(
+                <Btn variant="green" onClick={()=>handleMarkPaid(viewInv)}>✓ Mark as Paid</Btn>
+              )}
+              {viewInv.status!=='cancelled'&&(
+                <Btn variant="danger" onClick={()=>handleCancel(viewInv)}>✕ Cancel Invoice</Btn>
+              )}
             </div>
           </div>
         </Modal>
