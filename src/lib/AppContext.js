@@ -283,6 +283,21 @@ export const AppProvider = ({ children }) => {
   };
 
   // ── CRUD: RETURNS ────────────────────────────────────────────────────────
+  const updatePurchase = (id, updates) => {
+    auditLog('UPDATE','purchases',id,null,updates);
+    setPurchases(prev=>prev.map(p=>p.id===id?{...p,...updates}:p));
+  };
+
+  const deletePurchase = (id) => {
+    const item = purchases.find(p=>p.id===id);
+    if (item) { softDelete('purchases', item); (item.items||[]).forEach(i=>{ if(i.part_id) setParts(prev=>prev.map(p=>p.id===i.part_id?{...p,stock:Math.max(0,p.stock-i.qty)}:p)); }); }
+    setPurchases(prev=>prev.filter(p=>p.id!==id));
+  };
+
+  const updateExpense = (id, updates) => setExpenses(prev=>prev.map(e=>e.id===id?{...e,...updates}:e));
+  const deleteExpense = (id) => setExpenses(prev=>prev.filter(e=>e.id!==id));
+
+
   const addReturn = (ret) => {
     const id = `ret_${Date.now()}`;
     const returnNo = nextReturnNo();
@@ -350,7 +365,7 @@ export const AppProvider = ({ children }) => {
       customers, upsertCustomer,deleteCustomer,
       suppliers, upsertSupplier,deleteSupplier,
       invoices,  addInvoice,    updateInvoice, cancelInvoice,
-      purchases, addPurchase,
+      purchases, addPurchase, updatePurchase, deletePurchase,
       returns,   addReturn,
       jobCards,  upsertJobCard,
       expenses,  addExpense,
