@@ -6,6 +6,7 @@ import {
   Sparkles, LogOut, ArrowLeftRight, RefreshCw, TrendingUp
 } from 'lucide-react';
 import { useApp } from '../../lib/AppContext';
+import { getShopConfig } from '../../lib/shopConfig';
 import { useAuth } from '../../lib/AuthContext';
 
 const NAV_GROUPS = [
@@ -31,7 +32,7 @@ const NAV_GROUPS = [
     items: [
       { key: 'customers',   icon: Users,           label: 'customers' },
       { key: 'suppliers',   icon: Truck,           label: 'suppliers' },
-      { key: 'jobcards',    icon: Wrench,          label: 'jobCards' },
+      ...(_shopCfg.showJobCards !== false ? [{ key: 'jobcards', icon: Wrench, label: 'jobCards' }] : []),
     ]
   },
   {
@@ -54,6 +55,7 @@ const NAV_GROUPS = [
 export const Sidebar = ({ page, setPage, open, onClose }) => {
   const { t, stats } = useApp();
   const { user, logout, subscriptionStatus, can } = useAuth();
+  const _shopCfg = getShopConfig();
   const status = subscriptionStatus();
 
   const allItems = NAV_GROUPS.flatMap(g => g.items);
