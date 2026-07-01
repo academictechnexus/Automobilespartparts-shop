@@ -253,10 +253,16 @@ export const AppProvider = ({ children }) => {
   };
 
   // ── CRUD: INVOICES ───────────────────────────────────────────────────────
-  const addInvoice = (inv) => {
+  const addInvoice = (inv, options={}) => {
     auditLog('CREATE','invoices',inv.id,null,{invoice_no:inv.invoice_no,total:inv.grand_total});
+    // Check negative stock prevention (reads from shop settings)
+    const preventNegative = options.preventNegative !== false;
     (inv.items||[]).forEach(item => {
-      if (item.part_id) setParts(prev=>prev.map(p=>p.id===item.part_id?{...p,stock:Math.max(0,p.stock-item.qty)}:p));
+      if (item.part_id) setParts(prev=>prev.map(p=>{
+        if (p.id!==item.part_id) return p;
+        const newStock = preventNegative ? Math.max(0, p.stock - item.qty) : p.stock - item.qty;
+        return {...p, stock: newStock, last_sold_at: new Date().toISOString()};
+      }));
     });
     setInvoices(prev=>[{...inv,tenant_id:tenantId},...prev]);
   };
