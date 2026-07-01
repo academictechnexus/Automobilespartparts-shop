@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Users, Building2, Shield, Clock, Download, Plus, Edit2, Trash2, Eye, EyeOff, RefreshCw, ChevronRight } from 'lucide-react';
+import { Users, Building2, Shield, Clock, Download, Plus, Edit2, Trash2, RefreshCw, ChevronRight, Settings2 } from 'lucide-react';
 import { useAuth, ROLES, PLANS } from '../../lib/AuthContext';
 import { getAuditLogs, createBackup, restoreBackup, getLastBackup } from '../../lib/db';
 import { Modal, Btn, Field, Input, Select, PageHeader, Badge } from '../shared/UI';
 import { fmtDate } from '../../utils/helpers';
 import { useApp } from '../../lib/AppContext';
+import CustomFieldsManager from './CustomFieldsManager';
+import GoogleDriveBackup from './GoogleDriveBackup';
+import ShopTypeSelector from './ShopTypeSelector';
 
 const ADMIN_TABS = [
   { key: 'users', label: 'User Management', icon: Users },
@@ -12,6 +15,9 @@ const ADMIN_TABS = [
   { key: 'subscription', label: 'Subscription', icon: Shield },
   { key: 'audit', label: 'Audit Logs', icon: Clock },
   { key: 'backup', label: 'Backup & Restore', icon: Download },
+  { key: 'customfields', label: 'Custom Fields', icon: Settings2 },
+  { key: 'shoptype',    label: 'Shop Type',     icon: Building2 },
+  { key: 'gdrive',      label: 'Google Backup', icon: Download  },
 ];
 
 // ─── USER MANAGEMENT ──────────────────────────────────────────────────────────
@@ -390,7 +396,7 @@ export default function AdminPanel() {
     );
   }
 
-  const tabContent = { users: UserManagement, branches: BranchManagement, subscription: SubscriptionPanel, audit: AuditLogs, backup: BackupPanel };
+  const tabContent = { users: UserManagement, branches: BranchManagement, subscription: SubscriptionPanel, audit: AuditLogs, backup: BackupPanel, customfields: CustomFieldsManager, shoptype: ShopTypeSelector, gdrive: GoogleDriveBackup };
   const Content = tabContent[tab];
 
   return (
