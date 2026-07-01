@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Plus, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Package, History, AlertTriangle, Search } from 'lucide-react';
+import { Plus, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Package, History, AlertTriangle, Search, Download } from 'lucide-react';
 import { useApp } from '../../lib/AppContext';
 import { Modal, Btn, SearchBar, PageHeader, Table, THead, TRow, TD, Field, Input, Select, Textarea } from '../shared/UI';
-import { fmt, fmtDate, today } from '../../utils/helpers';
+import { fmt, fmtDate, today, exportToExcel } from '../../utils/helpers';
 
 const ADJ_TYPES = [
   { value: 'add',       label: 'Stock In (Add)',         icon: ArrowUpCircle,   color: 'text-green-400',  bg: 'bg-green-500/10 border-green-500/20' },
@@ -227,6 +227,33 @@ export default function StockAdjustment() {
       {/* HISTORY TAB */}
       {tab === 'history' && (
         <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <p className="text-gray-400 text-sm">{history.length} total adjustments</p>
+            <Btn variant="secondary" size="sm" onClick={() => exportToExcel(history, 'Stock_Adjustments')}>
+              <Download size={13}/>Export
+            </Btn>
+          </div>
+
+          {/* Latest 3 adjustments quick view */}
+          {history.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {history.slice(0, 3).map((h, i) => (
+                <div key={h.id} className={`rounded-xl p-3 border ${h.qty_change>0?'bg-green-500/8 border-green-500/20':'bg-red-500/8 border-red-500/20'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs font-semibold uppercase ${h.qty_change>0?'text-green-400':'text-red-400'}`}>{h.adj_type}</span>
+                    <span className="text-gray-600 text-xs">{fmtDate(h.date)}</span>
+                  </div>
+                  <div className="text-white text-sm font-medium truncate">{h.part_name}</div>
+                  <div className="text-gray-500 text-xs">{h.part_code}</div>
+                  <div className={`font-bold text-lg mt-1 ${h.qty_change>0?'text-green-400':'text-red-400'}`}>
+                    {h.qty_change>0?'+':''}{h.qty_change} units
+                  </div>
+                  <div className="text-gray-600 text-xs">{h.qty_before} → {h.qty_after} · {h.reason}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <Table>
             <THead cols={[
               { label: 'DATE' }, { label: 'PART' }, { label: 'TYPE' },
