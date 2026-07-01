@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, Printer, Phone, Download, Eye, ChevronLeft, X, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Printer, Phone, Download, Eye, ChevronLeft, X, CheckCircle, AlertTriangle, FileText, BarChart2, Calendar, CheckSquare, Square, Trash2 } from 'lucide-react';
 import { useApp } from '../../lib/AppContext';
 import { Modal, Badge, Btn, SearchBar, PageHeader, Table, THead, TRow, TD, Field, Input, Select, Textarea } from '../shared/UI';
 import { fmt, fmtDate, calcLineItem, calcInvoiceTotals, sendWhatsApp, generateInvoicePDF, today } from '../../utils/helpers';
@@ -512,17 +512,146 @@ function NewInvoice({ onBack, onSave, shop, customers, parts, nextInvoiceNo }) {
 // ─── INVOICE LIST ─────────────────────────────────────────────────────────────
 export default function Billing() {
   const { t, invoices, addInvoice, updateInvoice, cancelInvoice, customers, shop, parts, nextInvoiceNo } = useApp();
-  const [view, setView]           = useState('list');
-  const [search, setSearch]       = useState('');
+  const [view, setView]             = useState('list');
+  const [search, setSearch]         = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [viewInv, setViewInv]     = useState(null);
+  const [viewInv, setViewInv]       = useState(null);
   const [confirmCancel, setConfirmCancel] = useState(null);
+  // Bulk select
+  const [selected, setSelected]     = useState([]);
+  const [showReport, setShowReport] = useState(false);
+  // Date filter
+  const [dateFrom, setDateFrom]     = useState('');
+  const [dateTo, setDateTo]         = useState('');
+  const [quickDate, setQuickDate]   = useState('all');
+
+  const applyQuickDate = (range) => {
+    setQuickDate(range);
+    const now = new Date();
+    const fmt2 = (d) => d.toISOString().split('T')[0];
+    if (range === 'all')       { setDateFrom(''); setDateTo(''); }
+    else if (range === 'today') { setDateFrom(fmt2(now)); setDateTo(fmt2(now)); }
+    else if (range === 'week')  { const d=new Date(); d.setDate(d.getDate()-7); setDateFrom(fmt2(d)); setDateTo(fmt2(now)); }
+    else if (range === 'month') { setDateFrom(fmt2(new Date(now.getFullYear(),now.getMonth(),1))); setDateTo(fmt2(now)); }
+    else if (range === 'last')  { const s=new Date(now.getFullYear(),now.getMonth()-1,1); const e=new Date(now.getFullYear(),now.getMonth(),0); setDateFrom(fmt2(s)); setDateTo(fmt2(e)); }
+    else if (range === 'fy')    { const yr=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1; setDateFrom(`${yr}-04-01`); setDateTo(`${yr+1}-03-31`); }
+  };
 
   const filtered = invoices.filter(inv => {
     const ms = !search || inv.invoice_no?.toLowerCase().includes(search.toLowerCase()) || inv.customer_name?.toLowerCase().includes(search.toLowerCase());
     const mst = statusFilter === 'all' || inv.status === statusFilter;
-    return ms && mst;
+    const mdf = !dateFrom || inv.invoice_date >= dateFrom;
+    const mdt = !dateTo   || inv.invoice_date <= dateTo;
+    return ms && mst && mdf && mdt;
   });
+
+  // Bulk select helpers
+  const allSelected = filtered.length > 0 && filtered.every(i => selected.includes(i.id));
+  const toggleAll   = () => setSelected(allSelected ? [] : filtered.map(i => i.id));
+  const toggleOne   = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  const selectedInvs = invoices.filter(i => selected.includes(i.id));
+
+  // Bulk PDF download — generates one PDF per invoice
+  const bulkDownloadPDF = () => {
+    selectedInvs.forEach((inv, idx) => {
+      setTimeout(() => {
+        const customer = customers.find(c=>c.id===inv.customer_id);
+        generateInvoicePDF(inv, inv.items||[], shop, customer);
+      }, idx * 800); // stagger to avoid browser blocking
+    });
+  };
+
+  // Bulk Excel export
+  const bulkExportExcel = async () => {
+    const XLSX = await import('xlsx');
+    const data = selectedInvs.map(inv => ({
+      'Invoice No':     inv.invoice_no,
+      'Type':           inv.invoice_type||'Invoice',
+      'Date':           inv.invoice_date,
+      'Customer':       inv.customer_name,
+      'Customer GSTIN': inv.customer_gstin||'',
+      'Supply Type':    inv.supply_type,
+      'Subtotal':       inv.subtotal,
+      'Discount':       inv.discount_amt||0,
+      'Taxable Amt':    inv.taxable_amt,
+      'CGST':           inv.cgst_amt,
+      'SGST':           inv.sgst_amt,
+      'IGST':           inv.igst_amt,
+      'Total GST':      inv.total_gst,
+      'Grand Total':    inv.grand_total,
+      'Paid Amount':    inv.paid_amount||0,
+      'Balance Due':    inv.balance_due||0,
+      'Payment Mode':   inv.payment_mode,
+      'Status':         inv.status,
+      'Notes':          inv.notes||'',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
+    XLSX.writeFile(wb, `Invoices_${dateFrom||'all'}_to_${dateTo||'all'}.xlsx`);
+  };
+
+  // Bulk print — all selected in one print window
+  const bulkPrint = () => {
+    const rows = selectedInvs.map(inv => `
+      <div style="page-break-after:always;padding:20px;font-family:Arial,sans-serif">
+        <div style="display:flex;justify-content:space-between;margin-bottom:15px">
+          <div>
+            <h2 style="margin:0;color:#f97316">${shop.name||'AutoSpares Pro'}</h2>
+            <p style="margin:2px 0;font-size:12px;color:#555">${shop.address||''} | ${shop.phone||''}</p>
+            <p style="margin:2px 0;font-size:12px;color:#555">GSTIN: ${shop.gstin||''}</p>
+            <br/>
+            <b>Bill To:</b> ${inv.customer_name}<br/>
+            <span style="font-size:11px">${inv.billing_address||''} ${inv.customer_gstin?'| GSTIN: '+inv.customer_gstin:''}</span>
+          </div>
+          <div style="text-align:right">
+            <h3 style="margin:0">${(inv.invoice_type||'INVOICE').toUpperCase()}</h3>
+            <p style="margin:2px 0"><b>${inv.invoice_no}</b></p>
+            <p style="margin:2px 0;font-size:12px">Date: ${inv.invoice_date}</p>
+            <p style="margin:2px 0;font-size:12px">Mode: ${inv.payment_mode}</p>
+            <span style="background:${inv.status==='paid'?'#22c55e':'#ef4444'};color:white;padding:2px 8px;border-radius:4px;font-size:11px">${inv.status.toUpperCase()}</span>
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:#f3f4f6">
+            <th style="padding:6px;border:1px solid #ddd;text-align:left">#</th>
+            <th style="padding:6px;border:1px solid #ddd;text-align:left">Part</th>
+            <th style="padding:6px;border:1px solid #ddd">Qty</th>
+            <th style="padding:6px;border:1px solid #ddd;text-align:right">Rate</th>
+            <th style="padding:6px;border:1px solid #ddd;text-align:right">GST</th>
+            <th style="padding:6px;border:1px solid #ddd;text-align:right">Total</th>
+          </tr></thead>
+          <tbody>
+            ${(inv.items||[]).map((item,i) => `
+              <tr>
+                <td style="padding:5px;border:1px solid #eee">${i+1}</td>
+                <td style="padding:5px;border:1px solid #eee">${item.part_name}<br/><small style="color:#888">${item.part_code||''}</small></td>
+                <td style="padding:5px;border:1px solid #eee;text-align:center">${item.qty}</td>
+                <td style="padding:5px;border:1px solid #eee;text-align:right">₹${item.rate}</td>
+                <td style="padding:5px;border:1px solid #eee;text-align:right">${item.gst_rate}%</td>
+                <td style="padding:5px;border:1px solid #eee;text-align:right">₹${(item.qty*item.rate*(1+item.gst_rate/100)).toFixed(2)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        <div style="float:right;margin-top:10px;width:220px;font-size:12px">
+          <table style="width:100%">
+            <tr><td>Taxable</td><td style="text-align:right">₹${inv.taxable_amt?.toFixed(2)}</td></tr>
+            <tr><td>GST</td><td style="text-align:right">₹${inv.total_gst?.toFixed(2)}</td></tr>
+            <tr style="font-weight:bold;font-size:14px"><td>Grand Total</td><td style="text-align:right">₹${inv.grand_total?.toFixed(2)}</td></tr>
+            ${inv.balance_due>0?`<tr style="color:red"><td>Balance Due</td><td style="text-align:right">₹${inv.balance_due?.toFixed(2)}</td></tr>`:''}
+          </table>
+        </div>
+        <div style="clear:both;margin-top:30px;font-size:10px;color:#aaa;text-align:center">
+          Thank you for your business! — ${shop.name||''}
+        </div>
+      </div>
+    `).join('');
+
+    const w = window.open('', '_blank', 'width=900,height=700');
+    w.document.write(`<html><head><title>Invoices</title></head><body>${rows}</body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 600);
+  };
 
   const handlePDF = (inv) => {
     const customer = customers.find(c => c.id === inv.customer_id);
@@ -608,19 +737,90 @@ export default function Billing() {
     />
   );
 
+ 
+
+  const totals = {
+    all:     invoices.reduce((s,i)=>s+i.grand_total,0),
+    paid:    invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+i.grand_total,0),
+    unpaid:  invoices.filter(i=>i.status==='unpaid').reduce((s,i)=>s+i.balance_due,0),
+    partial: invoices.filter(i=>i.status==='partial').reduce((s,i)=>s+i.balance_due,0),
+  };
+
+  // Invoice Report data
+  const reportData = {
+    totalInvs:    filtered.length,
+    totalRevenue: filtered.reduce((s,i)=>s+i.grand_total,0),
+    totalTaxable: filtered.reduce((s,i)=>s+i.taxable_amt,0),
+    totalGST:     filtered.reduce((s,i)=>s+i.total_gst,0),
+    totalCGST:    filtered.reduce((s,i)=>s+i.cgst_amt,0),
+    totalSGST:    filtered.reduce((s,i)=>s+i.sgst_amt,0),
+    totalIGST:    filtered.reduce((s,i)=>s+i.igst_amt,0),
+    collected:    filtered.filter(i=>i.status==='paid').reduce((s,i)=>s+i.grand_total,0),
+    pending:      filtered.filter(i=>i.status!=='paid'&&!i.is_cancelled).reduce((s,i)=>s+i.balance_due,0),
+    byMode:       ['Cash','UPI','Cheque','NEFT','Credit'].map(m=>({
+      mode:m, count:filtered.filter(i=>i.payment_mode===m).length,
+      amount:filtered.filter(i=>i.payment_mode===m).reduce((s,i)=>s+i.grand_total,0)
+    })).filter(m=>m.count>0),
+  };
+
   return (
     <div className="space-y-4">
-      <PageHeader title={t.billing} subtitle={`${invoices.length} invoices`}>
-        <Btn variant="primary" onClick={() => setView('new')}><Plus size={15}/>{t.newSale}</Btn>
+      <PageHeader title={t.billing} subtitle={`${invoices.length} total invoices`}>
+        <Btn variant="secondary" onClick={()=>setShowReport(!showReport)}>
+          <BarChart2 size={14}/>{showReport?'Hide Report':'Invoice Report'}
+        </Btn>
+        <Btn variant="primary" onClick={()=>setView('new')}><Plus size={15}/>{t.newSale}</Btn>
       </PageHeader>
 
-      {/* Summary Cards */}
+      {/* ── INVOICE REPORT ── */}
+      {showReport && (
+        <div className="bg-gray-900 border border-orange-500/20 rounded-xl p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-orange-400 font-semibold flex items-center gap-2"><BarChart2 size={15}/>Invoice Report</h3>
+            <Btn variant="secondary" size="sm" onClick={()=>{ setSelected(filtered.map(i=>i.id)); setTimeout(bulkExportExcel,50); }}><Download size={13}/>Export All</Btn>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              {label:'Total Invoices', val:reportData.totalInvs,              c:'text-white'},
+              {label:'Total Revenue',  val:fmt(reportData.totalRevenue),       c:'text-orange-400'},
+              {label:'Taxable Amount', val:fmt(reportData.totalTaxable),       c:'text-blue-400'},
+              {label:'Total GST',      val:fmt(reportData.totalGST),           c:'text-yellow-400'},
+              {label:'CGST',           val:fmt(reportData.totalCGST),          c:'text-yellow-400'},
+              {label:'SGST',           val:fmt(reportData.totalSGST),          c:'text-yellow-400'},
+              {label:'IGST',           val:fmt(reportData.totalIGST),          c:'text-yellow-400'},
+              {label:'Collected',      val:fmt(reportData.collected),          c:'text-green-400'},
+              {label:'Pending',        val:fmt(reportData.pending),            c:'text-red-400'},
+            ].map(s=>(
+              <div key={s.label} className="bg-gray-800 rounded-xl p-3 text-center">
+                <div className={`font-bold text-base ${s.c}`}>{s.val}</div>
+                <div className="text-gray-500 text-xs mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {/* Payment Mode Breakdown */}
+          {reportData.byMode.length > 0 && (
+            <div>
+              <p className="text-gray-500 text-xs mb-2 uppercase tracking-wide">Payment Mode Breakdown</p>
+              <div className="flex flex-wrap gap-2">
+                {reportData.byMode.map(m=>(
+                  <div key={m.mode} className="bg-gray-800 rounded-xl px-4 py-2.5 text-center min-w-24">
+                    <div className="text-white font-semibold text-sm">{fmt(m.amount)}</div>
+                    <div className="text-gray-400 text-xs">{m.mode} ({m.count})</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SUMMARY CARDS ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          {label:'Total Revenue', val:fmt(totals.all),    color:'text-white'},
-          {label:'Collected',     val:fmt(totals.paid),   color:'text-green-400'},
-          {label:'Unpaid',        val:fmt(totals.unpaid), color:'text-red-400'},
-          {label:'Partial Due',   val:fmt(totals.partial),color:'text-yellow-400'},
+          {label:'Total Revenue', val:fmt(totals.all),     color:'text-white'},
+          {label:'Collected',     val:fmt(totals.paid),    color:'text-green-400'},
+          {label:'Unpaid',        val:fmt(totals.unpaid),  color:'text-red-400'},
+          {label:'Partial Due',   val:fmt(totals.partial), color:'text-yellow-400'},
         ].map(s=>(
           <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
             <div className={`font-bold text-lg ${s.color}`}>{s.val}</div>
@@ -629,7 +829,36 @@ export default function Billing() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* ── DATE FILTER ── */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <p className="text-gray-500 text-xs mb-1.5 flex items-center gap-1"><Calendar size={11}/>Quick Date Filter</p>
+            <div className="flex gap-1 flex-wrap">
+              {[['all','All'],['today','Today'],['week','This Week'],['month','This Month'],['last','Last Month'],['fy','FY 2024-25']].map(([v,l])=>(
+                <button key={v} onClick={()=>applyQuickDate(v)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${quickDate===v?'bg-orange-500 text-white':'bg-gray-800 text-gray-400 hover:text-white'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-2 ml-auto">
+            <div>
+              <p className="text-gray-500 text-xs mb-1">From</p>
+              <input type="date" value={dateFrom} onChange={e=>{setDateFrom(e.target.value);setQuickDate('custom');}}
+                className="bg-gray-800 border border-gray-700 text-white rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-orange-500"/>
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs mb-1">To</p>
+              <input type="date" value={dateTo} onChange={e=>{setDateTo(e.target.value);setQuickDate('custom');}}
+                className="bg-gray-800 border border-gray-700 text-white rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-orange-500"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SEARCH + STATUS FILTER ── */}
       <div className="flex flex-wrap gap-2">
         <SearchBar value={search} onChange={setSearch} placeholder="Search invoice no or customer..." className="flex-1 min-w-48"/>
         <div className="flex gap-1 flex-wrap">
@@ -642,47 +871,122 @@ export default function Billing() {
         </div>
       </div>
 
-      {/* Table */}
-      <Table>
-        <THead cols={[
-          {label:'INVOICE NO'},{label:'CUSTOMER'},
-          {label:'DATE',hidden:'hidden md:table-cell'},
-          {label:'AMOUNT',align:'right'},
-          {label:'STATUS',align:'center'},
-          {label:'ACTIONS',align:'center'},
-        ]}/>
-        <tbody>
-          {filtered.length===0&&<tr><td colSpan={6} className="text-center py-12 text-gray-600 text-sm">No invoices found</td></tr>}
-          {filtered.map(inv=>(
-            <TRow key={inv.id}>
-              <TD><span className="text-orange-400 font-mono text-xs">{inv.invoice_no}</span></TD>
-              <TD><span className="text-white text-sm">{inv.customer_name}</span></TD>
-              <TD className="hidden md:table-cell"><span className="text-gray-400 text-xs">{fmtDate(inv.invoice_date)}</span></TD>
-              <TD align="right">
-                <div className="text-white font-semibold">{fmt(inv.grand_total)}</div>
-                {inv.balance_due>0&&<div className="text-red-400 text-xs">Due: {fmt(inv.balance_due)}</div>}
-              </TD>
-              <TD align="center"><Badge status={inv.status}/></TD>
-              <TD align="center">
-                <div className="flex items-center justify-center gap-1.5">
-                  <button onClick={()=>setViewInv(inv)} title="View" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-blue-400 transition-colors"><Eye size={13}/></button>
-                  <button onClick={()=>handlePDF(inv)} title="PDF" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-orange-400 transition-colors"><Download size={13}/></button>
-                  <button onClick={()=>handlePrint(inv)} title="Print" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors"><Printer size={13}/></button>
-                  <button onClick={()=>handleWhatsApp(inv)} title="WhatsApp" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-green-400 transition-colors"><Phone size={13}/></button>
-                  {inv.status!=='cancelled'&&inv.status!=='paid'&&(
-                    <button onClick={()=>handleMarkPaid(inv)} title="Mark as Paid" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-green-400 transition-colors text-xs font-bold">✓</button>
-                  )}
-                  {inv.status!=='cancelled'&&(
-                    <button onClick={()=>handleCancel(inv)} title="Cancel Invoice" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-red-400 transition-colors text-xs">✕</button>
-                  )}
-                </div>
-              </TD>
-            </TRow>
-          ))}
-        </tbody>
-      </Table>
+      {/* ── BULK ACTION BAR ── */}
+      {selected.length > 0 && (
+        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
+          <span className="text-orange-400 font-semibold text-sm">{selected.length} invoice{selected.length>1?'s':''} selected</span>
+          <span className="text-gray-400 text-xs">Total: {fmt(selectedInvs.reduce((s,i)=>s+i.grand_total,0))}</span>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            <Btn variant="secondary" size="sm" onClick={bulkPrint}>
+              <Printer size={13}/>Print All
+            </Btn>
+            <Btn variant="secondary" size="sm" onClick={bulkDownloadPDF}>
+              <Download size={13}/>PDF All
+            </Btn>
+            <Btn variant="secondary" size="sm" onClick={bulkExportExcel}>
+              <FileText size={13}/>Excel
+            </Btn>
+            <Btn variant="secondary" size="sm" onClick={()=>setSelected([])}>
+              <X size={13}/>Clear
+            </Btn>
+          </div>
+        </div>
+      )}
 
-      {/* View Invoice Modal */}
+      {/* ── INVOICE TABLE ── */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        {/* Table header with select all */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800">
+          <div className="flex items-center gap-3">
+            <button onClick={toggleAll} className="text-gray-400 hover:text-orange-400 transition-colors">
+              {allSelected ? <CheckSquare size={16} className="text-orange-400"/> : <Square size={16}/>}
+            </button>
+            <span className="text-gray-500 text-xs">{filtered.length} invoices{dateFrom||dateTo?' in range':''}</span>
+          </div>
+          {filtered.length > 0 && (
+            <div className="flex gap-2">
+              <Btn variant="secondary" size="sm" onClick={()=>setSelected(filtered.map(i=>i.id))}>
+                Select All {filtered.length}
+              </Btn>
+            </div>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-800 text-xs text-gray-500">
+                <th className="w-8 px-4 py-3"></th>
+                <th className="text-left px-4 py-3">INVOICE NO</th>
+                <th className="text-left px-4 py-3">CUSTOMER</th>
+                <th className="text-left px-4 py-3 hidden md:table-cell">DATE</th>
+                <th className="text-left px-4 py-3 hidden lg:table-cell">MODE</th>
+                <th className="text-right px-4 py-3">AMOUNT</th>
+                <th className="text-center px-4 py-3">STATUS</th>
+                <th className="text-center px-4 py-3">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length===0&&(
+                <tr><td colSpan={8} className="text-center py-12 text-gray-600 text-sm">
+                  No invoices found for the selected filters
+                </td></tr>
+              )}
+              {filtered.map(inv=>(
+                <tr key={inv.id}
+                  className={`border-b border-gray-800/40 hover:bg-gray-800/20 transition-colors ${selected.includes(inv.id)?'bg-orange-500/5':''}`}>
+                  <td className="px-4 py-3">
+                    <button onClick={()=>toggleOne(inv.id)} className="text-gray-500 hover:text-orange-400 transition-colors">
+                      {selected.includes(inv.id)?<CheckSquare size={15} className="text-orange-400"/>:<Square size={15}/>}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-orange-400 font-mono text-xs">{inv.invoice_no}</span>
+                    {inv.is_cancelled&&<div className="text-red-400 text-xs">Cancelled</div>}
+                  </td>
+                  <td className="px-4 py-3"><span className="text-white text-sm">{inv.customer_name}</span></td>
+                  <td className="px-4 py-3 hidden md:table-cell"><span className="text-gray-400 text-xs">{fmtDate(inv.invoice_date)}</span></td>
+                  <td className="px-4 py-3 hidden lg:table-cell"><span className="text-gray-400 text-xs">{inv.payment_mode}</span></td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="text-white font-semibold">{fmt(inv.grand_total)}</div>
+                    {inv.balance_due>0&&<div className="text-red-400 text-xs">Due:{fmt(inv.balance_due)}</div>}
+                  </td>
+                  <td className="px-4 py-3 text-center"><Badge status={inv.status}/></td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button onClick={()=>setViewInv(inv)} title="View" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-blue-400 transition-colors"><Eye size={13}/></button>
+                      <button onClick={()=>handlePDF(inv)} title="PDF" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-orange-400 transition-colors"><Download size={13}/></button>
+                      <button onClick={()=>handlePrint(inv)} title="Print" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors"><Printer size={13}/></button>
+                      <button onClick={()=>handleWhatsApp(inv)} title="WhatsApp" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-green-400 transition-colors"><Phone size={13}/></button>
+                      {inv.status!=='cancelled'&&inv.status!=='paid'&&(
+                        <button onClick={()=>handleMarkPaid(inv)} title="Mark Paid" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-green-400 transition-colors text-xs font-bold">✓</button>
+                      )}
+                      {inv.status!=='cancelled'&&(
+                        <button onClick={()=>handleCancel(inv)} title="Cancel" className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-red-400 transition-colors text-xs">✕</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            {filtered.length>0&&(
+              <tfoot>
+                <tr className="bg-gray-800/60 border-t border-gray-700">
+                  <td colSpan={5} className="px-4 py-3 text-gray-400 text-sm font-semibold">
+                    Total ({filtered.length} invoices){selected.length>0?` · ${selected.length} selected`:''}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="text-white font-bold">{fmt(filtered.reduce((s,i)=>s+i.grand_total,0))}</div>
+                    <div className="text-yellow-400 text-xs">GST: {fmt(filtered.reduce((s,i)=>s+i.total_gst,0))}</div>
+                  </td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      {/* ── VIEW INVOICE MODAL ── */}
       {viewInv && (
         <Modal open={!!viewInv} onClose={()=>setViewInv(null)} title={`${viewInv.invoice_type||'Invoice'}: ${viewInv.invoice_no}`} size="lg">
           <div className="p-5 space-y-4">
@@ -694,13 +998,12 @@ export default function Billing() {
                 {viewInv.billing_address&&<p className="text-gray-500 text-xs">{viewInv.billing_address}</p>}
               </div>
               <div className="text-right">
-                <p className="text-gray-500 text-xs">Date</p>
+                <p className="text-gray-500 text-xs">Date / Mode</p>
                 <p className="text-white">{fmtDate(viewInv.invoice_date)}</p>
                 <p className="text-gray-400 text-xs">{viewInv.payment_mode}</p>
                 <Badge status={viewInv.status}/>
               </div>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-800 text-xs text-gray-500">
@@ -728,14 +1031,14 @@ export default function Billing() {
                 </tbody>
               </table>
             </div>
-
             <div className="space-y-1 text-sm border-t border-gray-800 pt-3">
+              <div className="flex justify-between text-gray-400"><span>Subtotal</span><span>{fmt(viewInv.subtotal)}</span></div>
+              {viewInv.discount_amt>0&&<div className="flex justify-between text-red-400"><span>Discount</span><span>-{fmt(viewInv.discount_amt)}</span></div>}
               <div className="flex justify-between text-gray-400"><span>Taxable</span><span>{fmt(viewInv.taxable_amt)}</span></div>
               <div className="flex justify-between text-gray-400"><span>GST</span><span>{fmt(viewInv.total_gst)}</span></div>
               <div className="flex justify-between text-white font-bold text-base"><span>Grand Total</span><span className="text-orange-400">{fmt(viewInv.grand_total)}</span></div>
               {viewInv.balance_due>0&&<div className="flex justify-between text-red-400"><span>Balance Due</span><span>{fmt(viewInv.balance_due)}</span></div>}
             </div>
-
             <div className="grid grid-cols-2 gap-2">
               <Btn variant="secondary" onClick={()=>handlePrint(viewInv)}><Printer size={13}/>Print</Btn>
               <Btn variant="secondary" onClick={()=>handlePDF(viewInv)}><Download size={13}/>PDF</Btn>
