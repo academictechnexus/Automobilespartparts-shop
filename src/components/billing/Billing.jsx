@@ -719,13 +719,6 @@ export default function Billing() {
     setViewInv(null);
   };
 
-  const totals = {
-    all: invoices.reduce((s,i)=>s+i.grand_total,0),
-    paid: invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+i.grand_total,0),
-    unpaid: invoices.filter(i=>i.status==='unpaid').reduce((s,i)=>s+i.balance_due,0),
-    partial: invoices.filter(i=>i.status==='partial').reduce((s,i)=>s+i.balance_due,0),
-  };
-
   if (view === 'new') return (
     <NewInvoice
       onBack={() => setView('list')}
