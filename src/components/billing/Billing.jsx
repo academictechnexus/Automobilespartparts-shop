@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, Printer, Phone, Download, Eye, ChevronLeft, X, CheckCircle } from 'lucide-react';
+import { Plus, Printer, Phone, Download, Eye, ChevronLeft, X, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../lib/AppContext';
 import { Modal, Badge, Btn, SearchBar, PageHeader, Table, THead, TRow, TD, Field, Input, Select, Textarea } from '../shared/UI';
 import { fmt, fmtDate, calcLineItem, calcInvoiceTotals, sendWhatsApp, generateInvoicePDF, today } from '../../utils/helpers';
@@ -77,6 +77,24 @@ function NewInvoice({ onBack, onSave, shop, customers, parts, nextInvoiceNo }) {
 
   const handleSave = () => {
     if (!selCustomer || items.length === 0) return;
+
+    // Check for stock issues
+    const stockIssues = items.filter(item => {
+      const part = parts.find(p => p.id === item.part_id);
+      return part && item.qty > part.stock;
+    });
+
+    if (stockIssues.length > 0) {
+      const names = stockIssues.map(i => {
+        const part = parts.find(p=>p.id===i.part_id);
+        return `${i.part_name} (available: ${part?.stock||0}, requested: ${i.qty})`;
+      }).join('\n');
+      const proceed = window.confirm(
+        `⚠️ Stock shortage for:\n${names}\n\nDo you want to proceed anyway? (Stock will go negative)`
+      );
+      if (!proceed) return;
+    }
+
     const inv = buildInvoice();
     onSave(inv);
     setSavedInv(inv);
@@ -317,7 +335,9 @@ function NewInvoice({ onBack, onSave, shop, customers, parts, nextInvoiceNo }) {
                       </div>
                       <div className="text-right ml-3 flex-shrink-0">
                         <div className="text-orange-400 text-sm font-semibold">{fmt(p.selling_price)}</div>
-                        <div className={`text-xs ${p.stock <= p.reorder_level ? 'text-red-400' : 'text-green-400'}`}>{p.stock} in stock</div>
+                        <div className={`text-xs font-semibold ${p.stock===0?'text-red-400':p.stock<=p.reorder_level?'text-yellow-400':'text-green-400'}`}>
+                          {p.stock===0?'⚠ OUT OF STOCK':p.stock<=p.reorder_level?`⚠ Low: ${p.stock}`:p.stock+' in stock'}
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -352,6 +372,15 @@ function NewInvoice({ onBack, onSave, shop, customers, parts, nextInvoiceNo }) {
                           <td className="px-4 py-2">
                             <div className="text-white text-sm font-medium">{item.part_name}</div>
                             <div className="text-gray-500 text-xs">{item.part_code} · HSN: {item.hsn_code}</div>
+                            {(() => {
+                              const part = parts.find(p=>p.id===item.part_id);
+                              if (part && item.qty > part.stock) return (
+                                <div className="text-red-400 text-xs flex items-center gap-1">
+                                  <AlertTriangle size={10}/> Only {part.stock} in stock
+                                </div>
+                              );
+                              return null;
+                            })()}
                           </td>
                           <td className="px-2 py-2">
                             <input type="number" min="0.01" step="0.01" value={item.qty}
