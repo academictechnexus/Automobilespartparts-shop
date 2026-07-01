@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Download, History, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, History, TrendingUp, TrendingDown } from 'lucide-react';
+import { getShopConfig } from '../../lib/shopConfig';
 import { useApp } from '../../lib/AppContext';
 import { Modal, Badge, Btn, SearchBar, PageHeader, Table, THead, TRow, TD, Field, Input, Select, Confirm } from '../shared/UI';
 import { fmt, exportToExcel } from '../../utils/helpers';
@@ -14,15 +15,24 @@ const getLastAdjustment = (partId) => {
   } catch { return null; }
 };
 
-const CATEGORIES = ['Brakes','Filters','Electrical','Engine','Cooling','Transmission','Suspension','Body','Tyres','Steering','Fuel System','Exhaust','Others'];
-const GST_RATES  = [0, 5, 12, 18, 28];
-const UNITS      = ['PCS','SET','KIT','LTR','MTR','KG','PAIR','BOX','NOS','GM'];
+// Dynamic based on shop type
+const _cfg       = getShopConfig();
+const CATEGORIES = _cfg.categories;
+const GST_RATES  = _cfg.commonGST?.length ? _cfg.commonGST : [0, 5, 12, 18, 28];
+const UNITS      = _cfg.units;
 const PART_TYPES = ['OEM','Aftermarket','Genuine','Duplicate','Refurbished'];
+const ITEM_LABEL = _cfg.itemLabel || 'Part';
+const CODE_LABEL = _cfg.codeLabel || 'Part Code';
+const SHOW_VEHICLE = _cfg.vehicleFields !== false;
+const SHOW_MAKE_MODEL = _cfg.showFields?.includes('make') !== false;
+const EXTRA_FIELDS = _cfg.extraInventoryFields || [];
+const DEFAULT_GST  = _cfg.defaultGST || 18;
+const DEFAULT_HSN  = _cfg.hsnSuggestion || '87083000';
 const QUALITIES  = ['Grade A','Grade B','Grade C','Premium','Standard'];
 
 const blank = {
   code:'', name:'', brand:'', make:'', model:'', year_range:'', category:'Brakes',
-  hsn_code:'87083000', gst_rate:18, purchase_price:'', selling_price:'', mrp:'',
+  hsn_code:DEFAULT_HSN, gst_rate:DEFAULT_GST, purchase_price:'', selling_price:'', mrp:'',
   stock:'', reorder_level:5, location:'', part_type:'Aftermarket', unit:'PCS',
   // Extra useful fields
   warranty_months:'', batch_no:'', expiry_date:'', weight:'',
@@ -98,9 +108,9 @@ export default function Inventory() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t.inventory} subtitle={`${parts.length} SKUs · ${parts.reduce((s,p)=>s+p.stock,0)} units`}>
+      <PageHeader title={t.inventory} subtitle={`${parts.length} ${ITEM_LABEL}s · ${parts.reduce((s,p)=>s+p.stock,0)} units`}>
         <Btn variant="secondary" onClick={handleExport}><Download size={14}/>Excel</Btn>
-        <Btn variant="primary"   onClick={openNew}><Plus size={15}/>Add Part</Btn>
+        <Btn variant="primary" onClick={openNew}><Plus size={15}/>Add {ITEM_LABEL}</Btn>
       </PageHeader>
 
       {/* Stats */}
@@ -207,7 +217,7 @@ export default function Inventory() {
       </Table>
 
       {/* ── PART FORM MODAL ── */}
-      <Modal open={showForm} onClose={()=>setShowForm(false)} title={editId?'Edit Part':'Add New Part'} size="xl">
+      <Modal open={showForm} onClose={()=>setShowForm(false)} title={editId?`Edit ${ITEM_LABEL}`:`Add New ${ITEM_LABEL}`} size="xl">
 
         {/* Tab Nav inside modal */}
         <div className="flex border-b border-gray-800 px-5">
@@ -223,15 +233,19 @@ export default function Inventory() {
           {/* BASIC INFO TAB */}
           {activeTab === 'basic' && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <Field label="Part Code" required><Input value={form.code} onChange={e=>f('code',e.target.value)} placeholder="BRK-001"/></Field>
+              <Field label={CODE_LABEL} required><Input value={form.code} onChange={e=>f('code',e.target.value)} placeholder="BRK-001"/></Field>
               <Field label="Part Name" required className="col-span-2"><Input value={form.name} onChange={e=>f('name',e.target.value)} placeholder="Brake Pad Set Front"/></Field>
               <Field label="Brand"><Input value={form.brand} onChange={e=>f('brand',e.target.value)} placeholder="TVS, Bosch, NGK..."/></Field>
               <Field label="Category"><Select value={form.category} onChange={e=>f('category',e.target.value)}>{CATEGORIES.map(c=><option key={c}>{c}</option>)}</Select></Field>
               <Field label="Part Type"><Select value={form.part_type} onChange={e=>f('part_type',e.target.value)}>{PART_TYPES.map(t=><option key={t}>{t}</option>)}</Select></Field>
-              <Field label="Vehicle Make"><Input value={form.make} onChange={e=>f('make',e.target.value)} placeholder="Maruti, Hyundai, TVS..."/></Field>
-              <Field label="Vehicle Model"><Input value={form.model} onChange={e=>f('model',e.target.value)} placeholder="Swift, i20, Apache..."/></Field>
-              <Field label="Year Range"><Input value={form.year_range} onChange={e=>f('year_range',e.target.value)} placeholder="2018-2023 or All"/></Field>
-              <Field label="OEM Part Number"><Input value={form.oem_part_no||''} onChange={e=>f('oem_part_no',e.target.value)} placeholder="Manufacturer part no"/></Field>
+              {SHOW_VEHICLE && <>
+                <Field label="Vehicle Make"><Input value={form.make} onChange={e=>f('make',e.target.value)} placeholder="Maruti, Hyundai, TVS..."/></Field>
+                <Field label="Vehicle Model"><Input value={form.model} onChange={e=>f('model',e.target.value)} placeholder="Swift, i20, Apache..."/></Field>
+                <Field label="Year Range"><Input value={form.year_range} onChange={e=>f('year_range',e.target.value)} placeholder="2018-2023 or All"/></Field>
+              </>}
+              {_cfg.showFields?.includes('oem_part_no') !== false && (
+                <Field label="OEM Part Number"><Input value={form.oem_part_no||''} onChange={e=>f('oem_part_no',e.target.value)} placeholder="Manufacturer part no"/></Field>
+              )}
               <Field label="HSN Code"><Input value={form.hsn_code} onChange={e=>f('hsn_code',e.target.value)} placeholder="87083000"/></Field>
               <Field label="GST Rate %"><Select value={form.gst_rate} onChange={e=>f('gst_rate',e.target.value)}>{GST_RATES.map(r=><option key={r} value={r}>{r}%</option>)}</Select></Field>
               <Field label="Unit"><Select value={form.unit} onChange={e=>f('unit',e.target.value)}>{UNITS.map(u=><option key={u}>{u}</option>)}</Select></Field>
@@ -241,6 +255,28 @@ export default function Inventory() {
                   placeholder="Additional description..."
                   className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500 resize-none"/>
               </Field>
+              {EXTRA_FIELDS.map(ef => (
+                <Field key={ef.name} label={ef.label} className={ef.type==='textarea'?'col-span-2 md:col-span-3':''}>
+                  {ef.type==='select'
+                    ? <Select value={form[ef.name]||''} onChange={e=>f(ef.name,e.target.value)}>
+                        <option value="">— Select —</option>
+                        {(ef.options||'').split(',').map(o=><option key={o.trim()} value={o.trim()}>{o.trim()}</option>)}
+                      </Select>
+                    : ef.type==='checkbox'
+                    ? <div className="flex items-center gap-2 mt-1">
+                        <button type="button" onClick={()=>f(ef.name,!form[ef.name])}
+                          className={`w-10 h-5 rounded-full transition-colors relative ${form[ef.name]?'bg-orange-500':'bg-gray-700'}`}>
+                          <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${form[ef.name]?'left-5':'left-0.5'}`}/>
+                        </button>
+                        <span className="text-gray-400 text-xs">Yes</span>
+                      </div>
+                    : ef.type==='textarea'
+                    ? <textarea value={form[ef.name]||''} onChange={e=>f(ef.name,e.target.value)} rows={2} placeholder={ef.placeholder||''}
+                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500 resize-none"/>
+                    : <Input type={ef.type==='number'?'number':'text'} value={form[ef.name]||''} onChange={e=>f(ef.name,e.target.value)} placeholder={ef.placeholder||''}/>
+                  }
+                </Field>
+              ))}
             </div>
           )}
 
