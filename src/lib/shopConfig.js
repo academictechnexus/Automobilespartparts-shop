@@ -177,8 +177,12 @@ export const SHOP_TYPES = {
 
 // ─── GET CURRENT SHOP CONFIG ──────────────────────────────────────────────────
 export const getShopConfig = () => {
-  const type = localStorage.getItem('shop_type') || 'auto_parts';
-  return SHOP_TYPES[type] || SHOP_TYPES.auto_parts;
+  try {
+    const type = localStorage.getItem('shop_type') || 'auto_parts';
+    return SHOP_TYPES[type] || SHOP_TYPES.auto_parts;
+  } catch {
+    return SHOP_TYPES.auto_parts;
+  }
 };
 
 export const setShopType = (type) => {

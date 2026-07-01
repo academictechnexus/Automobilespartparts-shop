@@ -15,24 +15,13 @@ const getLastAdjustment = (partId) => {
   } catch { return null; }
 };
 
-// Dynamic based on shop type
-const _cfg       = getShopConfig();
-const CATEGORIES = _cfg.categories;
-const GST_RATES  = _cfg.commonGST?.length ? _cfg.commonGST : [0, 5, 12, 18, 28];
-const UNITS      = _cfg.units;
+// Static fallbacks (overridden inside component)
 const PART_TYPES = ['OEM','Aftermarket','Genuine','Duplicate','Refurbished'];
-const ITEM_LABEL = _cfg.itemLabel || 'Part';
-const CODE_LABEL = _cfg.codeLabel || 'Part Code';
-const SHOW_VEHICLE = _cfg.vehicleFields !== false;
-const SHOW_MAKE_MODEL = _cfg.showFields?.includes('make') !== false;
-const EXTRA_FIELDS = _cfg.extraInventoryFields || [];
-const DEFAULT_GST  = _cfg.defaultGST || 18;
-const DEFAULT_HSN  = _cfg.hsnSuggestion || '87083000';
 const QUALITIES  = ['Grade A','Grade B','Grade C','Premium','Standard'];
 
 const blank = {
   code:'', name:'', brand:'', make:'', model:'', year_range:'', category:'Brakes',
-  hsn_code:DEFAULT_HSN, gst_rate:DEFAULT_GST, purchase_price:'', selling_price:'', mrp:'',
+  hsn_code:'87083000', gst_rate:18, purchase_price:'', selling_price:'', mrp:'',
   stock:'', reorder_level:5, location:'', part_type:'Aftermarket', unit:'PCS',
   // Extra useful fields
   warranty_months:'', batch_no:'', expiry_date:'', weight:'',
@@ -43,6 +32,16 @@ const blank = {
 };
 
 export default function Inventory() {
+  // Load shop config inside component (safe - runs after React mounts)
+  const _cfg       = getShopConfig();
+  const CATEGORIES = _cfg.categories || ['Brakes','Filters','Electrical','Engine','Cooling','Transmission','Suspension','Body','Tyres','Steering','Fuel System','Exhaust','Others'];
+  const GST_RATES  = _cfg.commonGST?.length ? _cfg.commonGST : [0, 5, 12, 18, 28];
+  const UNITS      = _cfg.units || ['PCS','SET','KIT','LTR','MTR','KG','PAIR','BOX'];
+  const ITEM_LABEL = _cfg.itemLabel || 'Part';
+  const CODE_LABEL = _cfg.codeLabel || 'Part Code';
+  const SHOW_VEHICLE   = _cfg.vehicleFields !== false;
+  const EXTRA_FIELDS   = _cfg.extraInventoryFields || [];
+
   const { t, parts, upsertPart, deletePart } = useApp();
   const [search, setSearch]       = useState('');
   const [catFilter, setCatFilter] = useState('All');

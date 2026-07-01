@@ -32,7 +32,7 @@ const NAV_GROUPS = [
     items: [
       { key: 'customers',   icon: Users,           label: 'customers' },
       { key: 'suppliers',   icon: Truck,           label: 'suppliers' },
-      ...(_shopCfg.showJobCards !== false ? [{ key: 'jobcards', icon: Wrench, label: 'jobCards' }] : []),
+      { key: 'jobcards', icon: Wrench, label: 'jobCards' },
     ]
   },
   {
@@ -56,6 +56,7 @@ export const Sidebar = ({ page, setPage, open, onClose }) => {
   const { t, stats } = useApp();
   const { user, logout, subscriptionStatus, can } = useAuth();
   const _shopCfg = getShopConfig();
+  const showJobCards = _shopCfg.showJobCards !== false;
   const status = subscriptionStatus();
 
   const allItems = NAV_GROUPS.flatMap(g => g.items);
@@ -91,7 +92,7 @@ export const Sidebar = ({ page, setPage, open, onClose }) => {
           {NAV_GROUPS.map(group => (
             <div key={group.label} className="mb-2">
               <p className="text-gray-600 text-xs font-semibold px-3 py-1.5 uppercase tracking-wider">{group.label}</p>
-              {group.items.filter(item => !item.ownerOnly || can('admin.view')).map(item => {
+              {group.items.filter(item => (!item.ownerOnly || can('admin.view')) && (item.key !== 'jobcards' || showJobCards)).map(item => {
                 const isActive = page === item.key;
                 const badge = item.key === 'inventory' && stats.lowStockCount > 0 ? stats.lowStockCount : null;
                 const label = item.noTranslate ? item.label : (t[item.label] || item.label);
