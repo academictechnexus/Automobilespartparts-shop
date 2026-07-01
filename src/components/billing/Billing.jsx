@@ -1,11 +1,14 @@
 import { useState, useRef } from 'react';
 import { Plus, Printer, Phone, Download, Eye, ChevronLeft, X, CheckCircle, AlertTriangle, FileText, BarChart2, Calendar, CheckSquare, Square, Trash2 } from 'lucide-react';
 import { useApp } from '../../lib/AppContext';
+import { getShopConfig } from '../../lib/shopConfig';
 import { Modal, Badge, Btn, SearchBar, PageHeader, Table, THead, TRow, TD, Field, Input, Select, Textarea } from '../shared/UI';
 import { fmt, fmtDate, calcLineItem, calcInvoiceTotals, sendWhatsApp, generateInvoicePDF, today } from '../../utils/helpers';
 
 // ─── NEW INVOICE FORM ─────────────────────────────────────────────────────────
 function NewInvoice({ onBack, onSave, shop, customers, parts, nextInvoiceNo }) {
+  const _shopCfg = getShopConfig();
+  const ITEM_LABEL = _shopCfg.itemLabel || 'Part';
   const [invType, setInvType]       = useState('Invoice');
   const [supplyType, setSupplyType] = useState('intrastate');
   const [invDate, setInvDate]       = useState(today());
@@ -314,7 +317,7 @@ function NewInvoice({ onBack, onSave, shop, customers, parts, nextInvoiceNo }) {
               <span className="text-gray-400 text-xs uppercase tracking-wide">Items ({items.length}) *</span>
               <button onClick={() => setShowPicker(!showPicker)}
                 className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-                <Plus size={13}/> Add Part
+                <Plus size={13}/> Add {ITEM_LABEL}
               </button>
             </div>
 
@@ -467,7 +470,7 @@ function NewInvoice({ onBack, onSave, shop, customers, parts, nextInvoiceNo }) {
             )}
 
             <Field label="Notes">
-              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Any special notes..."/>
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder={getShopConfig().defaultTerms || "Any special notes..."}/>
             </Field>
 
             {/* Validation hint */}
